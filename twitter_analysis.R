@@ -1,6 +1,8 @@
 ## JUST MESSING WITH TWITTER
 
 library(twitteR)
+library(wordcloud)
+library(tidyverse)
 
 creds <- read.csv("twitter.config")
 
@@ -20,3 +22,21 @@ for(tweet in 1:length(dat)){
 }
 
 tmp <- NULL
+
+df_dat$clean_text <- gsub("https.*$", "", df_dat$text)
+df_dat$url <- gsub("^.*(https.*$)", "\\1", df_dat$text)
+df_dat$url <- ifelse(grepl("^https", df_dat$url), df_dat$url, "")
+
+total_tweets <- length(unique(df_dat$id))
+
+total_tweeters <- length(unique(df_dat$screenName))
+
+top_5_tweeters <- df_dat %>% 
+    group_by(screenName) %>% 
+    summarise(tweets = length(unique(id)))
+
+top_5_tweeters <- top_5_tweeters[order(top_5_tweeters$tweets, decreasing = TRUE), ]
+top_5_tweeters <- top_5_tweeters[1:5, ]
+
+top_tweet <- df_dat$clean_text[df_dat$favoriteCount == max(df_dat$favoriteCount)]
+cat(top_tweet)

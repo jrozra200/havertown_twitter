@@ -14,7 +14,8 @@ ui <- fluidPage(
 
     # Application title
     titlePanel(h1("Havertown, PA Twitter Feed")),
-
+    
+    
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
         sidebarPanel(

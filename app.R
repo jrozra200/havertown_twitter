@@ -8,42 +8,148 @@
 #
 
 library(shiny)
+library(twitteR)
+library(wordcloud)
+library(tidyverse)
+library(knitr)
+library(wordcloud)
+library(tm)
+
+setup_twitter_oauth(creds$vars[1], 
+                    creds$vars[2], 
+                    creds$vars[3], 
+                    creds$vars[4])
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
 
     # Application title
-    titlePanel(h1("Havertown, PA Twitter Feed")),
+    titlePanel(h1("Twitter Analysis", align = "center")),
     
     
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
         sidebarPanel(
-            h1("some title"),
-            sliderInput("bins",
-                        "Number of bins:",
-                        min = 1,
-                        max = 50,
-                        value = 30)
+            h1("Let's Search Twitter"),
+            textInput("search_string", "Topic to Search", ""),
+            sliderInput("results", "Max Number of Tweets to Get", 
+                        min = 0, max = 1000, value = 25),
+            checkboxInput("check_dist", 
+                          paste0("Search a specific location? (belo",
+                                 "w will be ignored if unchecked)"),
+                          value = TRUE),
+            fluidRow(
+                column(6, textInput("lat", "Latitude", "39.9878")),
+                column(6, textInput("lon", "Longitude", "-75.3062"))
+                ),
+            sliderInput("dist", "Distance (miles)", 
+                        min = 0, max = 10, value = 2),
+            actionButton("submit", "Submit")
         ),
 
         # Show a plot of the generated distribution
         mainPanel(
-           plotOutput("distPlot")
+            h2(textOutput("search_string")),
+            h3(textOutput("total_tweets")),
+            h3(textOutput("earliest_tweet")),
+            h3(textOutput("latest_tweet")),
+            h3("Most Favorited Tweet"),
+            tableOutput("top_tweet"),
+            plotOutput("wordcloud")
         )
     )
 )
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
-
-    output$distPlot <- renderPlot({
-        # generate bins based on input$bins from ui.R
-        x    <- faithful[, 2]
-        bins <- seq(min(x), max(x), length.out = input$bins + 1)
-
-        # draw the histogram with the specified number of bins
-        hist(x, breaks = bins, col = 'darkgray', border = 'white')
+    
+    get_tweets <- reactive({
+        searchTwitter(input$search_string, 
+                      geocode = ifelse(input$check_dist == TRUE, 
+                                       paste0(input$lat, ',', input$lon, ',', 
+                                              input$dist, 'mi'),
+                                       ''),
+                      resultType = "recent", n = input$results)
+        })
+    
+    format_data <- reactive({
+        dat <- get_tweets()
+        
+        df_dat <- data.frame()
+        for(tweet in 1:length(dat)){
+            tmp <- as.data.frame(dat[[tweet]])
+            
+            df_dat <- rbind(df_dat, tmp)
+        }
+        
+        tmp <- NULL
+        
+        df_dat$clean_text <- gsub("https.*$", "", df_dat$text)
+        df_dat$url <- gsub("^.*(https.*$)", "\\1", df_dat$text)
+        df_dat$url <- ifelse(grepl("^https", df_dat$url), df_dat$url, "")
+        
+        return(df_dat)
+    })
+    
+    output$search_string <- renderText({ 
+        paste0("Search String: \"", input$search_string, "\"")
+    })
+    
+    output$total_tweets <- renderText({ 
+        dat <- format_data()
+        paste0("Total Tweets: ", length(unique(dat$id)))
+    })
+    
+    output$earliest_tweet <- renderText({ 
+        dat <- format_data()
+        
+        earliest_tweet <- min(dat$created, na.rm = TRUE)
+        attributes(earliest_tweet)$tzone <- "America/New_York"
+        
+        earliest_tweet <- format(earliest_tweet, "%B %d, %Y %I:%M:%S %p %Z")
+        
+        paste0("Earliest Tweet: ", earliest_tweet)
+    })
+    
+    output$latest_tweet <- renderText({ 
+        dat <- format_data()
+        
+        last_tweet <- max(dat$created, na.rm = TRUE)
+        attributes(last_tweet)$tzone <- "America/New_York"
+        
+        last_tweet <- format(last_tweet, "%B %d, %Y %I:%M:%S %p %Z")
+        
+        paste0("Latest Tweet: ", last_tweet)
+    })
+    
+    output$top_tweet <- renderTable({
+        dat <- format_data()
+        
+        tab <- as.data.frame(dat[dat$favoriteCount == max(dat$favoriteCount), 
+                   c("created", "screenName", "clean_text", "favoriteCount", "url")])
+        
+        tab$favoriteCount <- as.integer(tab$favoriteCount)
+        
+        names(tab) <- c("Tweet Date", "Twitter Handle", "Tweet", "Favorites", "URL")
+        
+        tab
+    })
+    
+    output$wordcloud <- renderPlot({
+        dat <- format_data()
+        
+        wc <- Corpus(VectorSource(paste(dat$clean_text, collapse = " ")))
+        
+        wc <- tm_map(wc, removePunctuation)
+        wc <- tm_map(wc, function(x){removeWords(x, stopwords())})
+        
+        doc_mat <- TermDocumentMatrix(wc)
+        mat <- as.matrix(doc_mat)
+        vec <- sort(rowSums(mat), decreasing = TRUE)
+        df <- data.frame(word = names(v), freq = v)
+        df <- df[1:20, ]
+        
+        wordcloud(df$word, df$freq, min.freq = 1)
     })
 }
 

@@ -12,7 +12,7 @@ setup_twitter_oauth(creds$vars[1],
                     creds$vars[4])
 
 dat <- searchTwitter('', geocode = '39.9878,-75.3062,2mi',
-                     resultType = "recent", n = 1000)
+                     resultType = "recent", n = 25)
 
 df_dat <- data.frame()
 for(tweet in 1:length(dat)){
@@ -40,3 +40,30 @@ top_5_tweeters <- top_5_tweeters[1:5, ]
 
 top_tweet <- df_dat$clean_text[df_dat$favoriteCount == max(df_dat$favoriteCount)]
 cat(top_tweet)
+
+earliest_tweet <- min(df_dat$created, na.rm = TRUE)
+attributes(earliest_tweet)$tzone <- "America/New_York"
+
+last_tweet <- max(df_dat$created, na.rm = TRUE)
+attributes(last_tweet)$tzone <- "America/New_York"
+
+library(wordcloud)
+library(tm)
+
+crude <- Corpus(VectorSource(paste(df_dat$clean_text, collapse = " ")))
+
+crude <- tm_map(crude, removePunctuation)
+crude <- tm_map(crude, function(x){removeWords(x, stopwords())})
+
+tdm <- TermDocumentMatrix(crude)
+m <- as.matrix(tdm)
+v <- sort(rowSums(m),decreasing=TRUE)
+d <- data.frame(word = names(v),freq=v)
+
+wordcloud(d$word, d$freq, min.freq = 2)
+
+#A bigger cloud with a minimum frequency of 2
+wordcloud(d$word,d$freq,c(8,.3),2)
+
+#Now lets try it with frequent words plotted first
+wordcloud(d$word,d$freq,c(8,.5),2,,FALSE,.1)

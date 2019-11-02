@@ -31,19 +31,26 @@ ui <- fluidPage(
     sidebarLayout(
         sidebarPanel(
             h1("Let's Search Twitter"),
-            textInput("search_string", "Topic to Search", ""),
-            sliderInput("results", "Max Number of Tweets to Get", 
-                        min = 0, max = 1000, value = 25),
+            fluidRow(
+                column(6, textInput("search_string", "Topic to Search", "")),
+                column(6, textInput("results", "Max Number of Tweets to Get", 
+                                    value = 25))
+            ),
+            
+            helpText(paste0("Note: you cannot leave the search string (above) ",
+                            "blank if you uncheck this box requesting location",
+                            " details.")),
             checkboxInput("check_dist", 
                           paste0("Search a specific location? (belo",
                                  "w will be ignored if unchecked)"),
                           value = TRUE),
+            
             fluidRow(
-                column(6, textInput("lat", "Latitude", "39.9878")),
-                column(6, textInput("lon", "Longitude", "-75.3062"))
+                column(4, textInput("lat", "Latitude", "39.9878")),
+                column(4, textInput("lon", "Longitude", "-75.3062")),
+                column(4, textInput("dist", "Distance (miles)", value = 2))
                 ),
-            sliderInput("dist", "Distance (miles)", 
-                        min = 0, max = 10, value = 2),
+            
             actionButton("submit", "Submit")
         ),
 
@@ -66,7 +73,7 @@ ui <- fluidPage(
                 column(6, h3("Top 10 Tweeters"),
                        tableOutput("top_5_tweeters")),
                 column(6, h3("Wordcloud of Tweets"),
-                       plotOutput("wordcloud"))
+                       plotOutput("wordcloud", height = "400px"))
             )
         )
     )
@@ -76,12 +83,16 @@ ui <- fluidPage(
 server <- function(input, output) {
     
     get_tweets <- reactive({
-        searchTwitter(input$search_string, 
-                      geocode = ifelse(input$check_dist == TRUE, 
-                                       paste0(input$lat, ',', input$lon, ',', 
-                                              input$dist, 'mi'),
-                                       NULL),
-                      resultType = "recent", n = input$results)
+        if(input$check_dist == TRUE) {
+            searchTwitter(input$search_string, 
+                          geocode = paste0(input$lat, ',', input$lon, ',', 
+                                           input$dist, 'mi'),
+                          resultType = "recent", n = input$results)
+        } else {
+            searchTwitter(input$search_string, resultType = "recent", 
+                          n = input$results)
+        }
+            
         })
     
     format_data <- reactive({
@@ -154,6 +165,8 @@ server <- function(input, output) {
         
         tab$favoriteCount <- as.integer(tab$favoriteCount)
         
+        tab <- tab[1, ]
+        
         fin <- data.frame(attr = c("Tweet Date", "Twitter Handle", "Tweet", 
                                    "Favorites", "URL"),
                           values = t(tab))
@@ -169,6 +182,8 @@ server <- function(input, output) {
                                  c("created", "screenName", "clean_text", "retweetCount", "url")])
         
         tab$retweetCount <- as.integer(tab$retweetCount)
+        
+        tab <- tab[1, ]
         
         fin <- data.frame(attr = c("Tweet Date", "Twitter Handle", "Tweet", 
                                    "Retweets", "URL"),
@@ -186,7 +201,12 @@ server <- function(input, output) {
             summarise(tweets = length(unique(id)))
         
         tab <- tab[order(tab$tweets, decreasing = TRUE), ]
-        tab <- tab[1:10, ]
+        
+        if(length(unique(dat$screenName)) >= 10){
+            tab <- tab[1:10, ]
+        } else {
+            tab <- tab[1:length(unique(dat$screenName)), ]
+        }
         
         names(tab) <- c("Twitter Handle", "Tweets")
         
@@ -204,10 +224,10 @@ server <- function(input, output) {
         doc_mat <- TermDocumentMatrix(wc)
         mat <- as.matrix(doc_mat)
         vec <- sort(rowSums(mat), decreasing = TRUE)
-        df <- data.frame(word = names(v), freq = v)
-        df <- df[1:20, ]
+        df <- data.frame(word = names(vec), freq = vec)
+        # df <- df[1:20, ]
         
-        wordcloud(df$word, df$freq, min.freq = 1)
+        wordcloud(df$word, df$freq, min.freq = 2)
     })
 }
 

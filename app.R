@@ -49,17 +49,25 @@ ui <- fluidPage(
 
         # Show a plot of the generated distribution
         mainPanel(
-            h2(textOutput("search_string")),
-            h3(textOutput("total_tweets")),
-            h3(textOutput("total_tweeters")),
-            h3(textOutput("earliest_tweet")),
-            h3(textOutput("latest_tweet")),
-            h3("Most Favorited Tweet"),
-            tableOutput("most_favorited_tweet"),
-            h3("Most Retweeted Tweet"),
-            tableOutput("most_retweeted"),
-            tableOutput("top_5_tweeters"),
-            plotOutput("wordcloud")
+            h1("Summary"),
+            textOutput("introduction1"),
+            br(),
+            textOutput("introduction2"),
+            textOutput("introduction3"),
+            
+            fluidRow(
+                column(6, h3("Most Favorited Tweet"), 
+                       tableOutput("most_favorited_tweet")),
+                column(6, h3("Most Retweeted Tweet"),
+                       tableOutput("most_retweeted"))
+            ),
+            
+            fluidRow(
+                column(6, h3("Top 10 Tweeters"),
+                       tableOutput("top_5_tweeters")),
+                column(6, h3("Wordcloud of Tweets"),
+                       plotOutput("wordcloud"))
+            )
         )
     )
 )
@@ -72,7 +80,7 @@ server <- function(input, output) {
                       geocode = ifelse(input$check_dist == TRUE, 
                                        paste0(input$lat, ',', input$lon, ',', 
                                               input$dist, 'mi'),
-                                       ''),
+                                       NULL),
                       resultType = "recent", n = input$results)
         })
     
@@ -97,40 +105,45 @@ server <- function(input, output) {
         return(df_dat)
     })
     
-    output$search_string <- renderText({ 
-        paste0("Search String: \"", input$search_string, "\"")
-    })
-    
-    output$total_tweets <- renderText({ 
+    output$introduction1 <- renderText({ 
         dat <- format_data()
-        paste0("Total Tweets: ", length(unique(dat$id)))
+        
+        paste0("This dashboard searched twitter for the following search strin",
+               "g:\"", input$search_string, "\". From this search, there were",
+               " ", length(unique(dat$id)), " total tweets returned from ", 
+               length(unique(dat$screenName)), " unique twitter handles.")
     })
     
-    output$total_tweeters <- renderText({ 
-        dat <- format_data()
-        paste0("Total Tweeters (unique twitter handles): ", length(unique(dat$screenName)))
-    })
-    
-    output$earliest_tweet <- renderText({ 
+    output$introduction2 <- renderText({ 
         dat <- format_data()
         
         earliest_tweet <- min(dat$created, na.rm = TRUE)
         attributes(earliest_tweet)$tzone <- "America/New_York"
         
-        earliest_tweet <- format(earliest_tweet, "%B %d, %Y %I:%M:%S %p %Z")
-        
-        paste0("Earliest Tweet: ", earliest_tweet)
-    })
-    
-    output$latest_tweet <- renderText({ 
-        dat <- format_data()
-        
         last_tweet <- max(dat$created, na.rm = TRUE)
         attributes(last_tweet)$tzone <- "America/New_York"
         
+        dif <- last_tweet - earliest_tweet
+        
+        earliest_tweet <- format(earliest_tweet, "%B %d, %Y %I:%M:%S %p %Z")
         last_tweet <- format(last_tweet, "%B %d, %Y %I:%M:%S %p %Z")
         
-        paste0("Latest Tweet: ", last_tweet)
+        paste0("The tweets returned span ", round(dif, 2), " ", 
+               attributes(dif)$units, "; from ", earliest_tweet, 
+               " to ", last_tweet, ".")
+    })
+    
+    output$introduction3 <- renderText({ 
+        if(input$check_dist == TRUE){
+            dat <- format_data()
+            
+            paste0("You have selected to return tweets from within ", input$dist, 
+                   " miles of ", input$lat, " latitude and ", input$lon, 
+                   " longitude.")    
+        } else {
+            paste0("You have not selected a specific geocode to search, so thi",
+                   "s dashboard is searching all of twitter, geographically.")
+        }
     })
     
     output$most_favorited_tweet <- renderTable({
@@ -141,9 +154,12 @@ server <- function(input, output) {
         
         tab$favoriteCount <- as.integer(tab$favoriteCount)
         
-        names(tab) <- c("Tweet Date", "Twitter Handle", "Tweet", "Favorites", "URL")
+        fin <- data.frame(attr = c("Tweet Date", "Twitter Handle", "Tweet", 
+                                   "Favorites", "URL"),
+                          values = t(tab))
+        names(fin) <- c("", "")
         
-        tab
+        fin
     })
     
     output$most_retweeted <- renderTable({
@@ -154,9 +170,12 @@ server <- function(input, output) {
         
         tab$retweetCount <- as.integer(tab$retweetCount)
         
-        names(tab) <- c("Tweet Date", "Twitter Handle", "Tweet", "Retweets", "URL")
+        fin <- data.frame(attr = c("Tweet Date", "Twitter Handle", "Tweet", 
+                                   "Retweets", "URL"),
+                          values = t(tab))
+        names(fin) <- c("", "")
         
-        tab
+        fin
     })
     
     output$top_5_tweeters <- renderTable({
@@ -167,7 +186,7 @@ server <- function(input, output) {
             summarise(tweets = length(unique(id)))
         
         tab <- tab[order(tab$tweets, decreasing = TRUE), ]
-        tab <- tab[1:5, ]
+        tab <- tab[1:10, ]
         
         names(tab) <- c("Twitter Handle", "Tweets")
         

@@ -12,7 +12,7 @@ setup_twitter_oauth(creds$vars[1],
                     creds$vars[4])
 
 dat <- searchTwitter('', geocode = '39.9878,-75.3062,2mi',
-                     resultType = "recent", n = 25)
+                     resultType = "recent", n = 1000)
 
 df_dat <- data.frame()
 for(tweet in 1:length(dat)){

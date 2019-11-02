@@ -51,10 +51,14 @@ ui <- fluidPage(
         mainPanel(
             h2(textOutput("search_string")),
             h3(textOutput("total_tweets")),
+            h3(textOutput("total_tweeters")),
             h3(textOutput("earliest_tweet")),
             h3(textOutput("latest_tweet")),
             h3("Most Favorited Tweet"),
-            tableOutput("top_tweet"),
+            tableOutput("most_favorited_tweet"),
+            h3("Most Retweeted Tweet"),
+            tableOutput("most_retweeted"),
+            tableOutput("top_5_tweeters"),
             plotOutput("wordcloud")
         )
     )
@@ -87,6 +91,8 @@ server <- function(input, output) {
         df_dat$clean_text <- gsub("https.*$", "", df_dat$text)
         df_dat$url <- gsub("^.*(https.*$)", "\\1", df_dat$text)
         df_dat$url <- ifelse(grepl("^https", df_dat$url), df_dat$url, "")
+        df_dat$twitter_client <- gsub("</a>$", "", df_dat$statusSource)
+        df_dat$twitter_client <- gsub("<.*\">", "", df_dat$twitter_client)
         
         return(df_dat)
     })
@@ -98,6 +104,11 @@ server <- function(input, output) {
     output$total_tweets <- renderText({ 
         dat <- format_data()
         paste0("Total Tweets: ", length(unique(dat$id)))
+    })
+    
+    output$total_tweeters <- renderText({ 
+        dat <- format_data()
+        paste0("Total Tweeters (unique twitter handles): ", length(unique(dat$screenName)))
     })
     
     output$earliest_tweet <- renderText({ 
@@ -122,7 +133,7 @@ server <- function(input, output) {
         paste0("Latest Tweet: ", last_tweet)
     })
     
-    output$top_tweet <- renderTable({
+    output$most_favorited_tweet <- renderTable({
         dat <- format_data()
         
         tab <- as.data.frame(dat[dat$favoriteCount == max(dat$favoriteCount), 
@@ -131,6 +142,34 @@ server <- function(input, output) {
         tab$favoriteCount <- as.integer(tab$favoriteCount)
         
         names(tab) <- c("Tweet Date", "Twitter Handle", "Tweet", "Favorites", "URL")
+        
+        tab
+    })
+    
+    output$most_retweeted <- renderTable({
+        dat <- format_data()
+        
+        tab <- as.data.frame(dat[dat$retweetCount == max(dat$retweetCount), 
+                                 c("created", "screenName", "clean_text", "retweetCount", "url")])
+        
+        tab$retweetCount <- as.integer(tab$retweetCount)
+        
+        names(tab) <- c("Tweet Date", "Twitter Handle", "Tweet", "Retweets", "URL")
+        
+        tab
+    })
+    
+    output$top_5_tweeters <- renderTable({
+        dat <- format_data()
+        
+        tab <- dat %>% 
+            group_by(screenName) %>% 
+            summarise(tweets = length(unique(id)))
+        
+        tab <- tab[order(tab$tweets, decreasing = TRUE), ]
+        tab <- tab[1:5, ]
+        
+        names(tab) <- c("Twitter Handle", "Tweets")
         
         tab
     })

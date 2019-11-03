@@ -14,6 +14,8 @@ library(tidyverse)
 library(knitr)
 library(wordcloud)
 library(tm)
+library(tidytext)
+library(scales)
 
 setup_twitter_oauth(creds$vars[1], 
                     creds$vars[2], 
@@ -34,7 +36,7 @@ ui <- fluidPage(
             fluidRow(
                 column(6, textInput("search_string", "Topic to Search", "")),
                 column(6, textInput("results", "Max Number of Tweets to Get", 
-                                    value = 25))
+                                    value = 100))
             ),
             
             helpText(paste0("Note: you cannot leave the search string (above) ",
@@ -60,6 +62,7 @@ ui <- fluidPage(
             textOutput("introduction1"),
             br(),
             textOutput("introduction2"),
+            br(),
             textOutput("introduction3"),
             
             fluidRow(
@@ -69,11 +72,16 @@ ui <- fluidPage(
                        tableOutput("most_retweeted"))
             ),
             
+            h3("Twitter Sentiment"),
+            textOutput("sentiment_level"),
+            br(),
+            plotOutput("sentiment", width = "100%", height = 600),
+            
             fluidRow(
-                column(6, h3("Top 10 Tweeters"),
+                column(4, h3("Top 10 Tweeters"),
                        tableOutput("top_5_tweeters")),
-                column(6, h3("Wordcloud of Tweets"),
-                       plotOutput("wordcloud", height = "400px"))
+                column(8, h3("Wordcloud of Tweets"),
+                       plotOutput("wordcloud", width = "100%", height = 600))
             )
         )
     )
@@ -114,6 +122,43 @@ server <- function(input, output) {
         df_dat$twitter_client <- gsub("<.*\">", "", df_dat$twitter_client)
         
         return(df_dat)
+    })
+    
+    get_sentiment <- reactive({
+        dat <- format_data()
+        
+        tweets <- dat %>%
+            unnest_tokens(clean_text, text)
+        
+        tweets <- tweets[, c("id", "clean_text")]
+        sent <- get_sentiments(lexicon = "bing")
+        tweets <- merge(tweets, sent, by.x = "clean_text", by.y = "word", all.x = TRUE)
+        
+        
+        tweet_sent <- tweets %>% 
+            group_by(id) %>%
+            summarise(positive = length(clean_text[!is.na(sentiment) & sentiment == "positive"]),
+                      negative = length(clean_text[!is.na(sentiment) & sentiment == "negative"]),
+                      neutral = length(clean_text[is.na(sentiment)])) %>% 
+            mutate(perc_pos = positive / (positive + negative + neutral),
+                   perc_neg = negative / (positive + negative + neutral),
+                   perc_neut = neutral / (positive + negative + neutral))
+        
+        tweet_sent$sentiment <- case_when(
+            tweet_sent$perc_pos >= tweet_sent$perc_neg  ~ "Positive",
+            tweet_sent$perc_neg >= tweet_sent$perc_pos ~ "Negative",
+            1 == 1 ~ "Neutral"
+        )
+        
+        tweet_sent$sentiment_value <- case_when(
+            tweet_sent$perc_pos >= tweet_sent$perc_neg  ~ tweet_sent$perc_pos,
+            tweet_sent$perc_neg >= tweet_sent$perc_pos ~ tweet_sent$perc_neg * -1,
+            1 == 1 ~ 0
+        )
+        
+        dat <- merge(dat, tweet_sent, by = "id")
+        
+        return(dat)
     })
     
     output$introduction1 <- renderText({ 
@@ -227,7 +272,38 @@ server <- function(input, output) {
         df <- data.frame(word = names(vec), freq = vec)
         # df <- df[1:20, ]
         
-        wordcloud(df$word, df$freq, min.freq = 2)
+        wordcloud(df$word, df$freq, min.freq = 2, random.order = FALSE,
+                  colors = "black", rot.per = 0.2, max.words = 100)
+    })
+    
+    output$sentiment <- renderPlot({
+        dat <- get_sentiment()
+        
+        df_dat <- df_dat[order(df_dat$created), ]
+        
+        ggplot(dat, aes(x = id, y = sentiment_value, group = sentiment, fill = sentiment)) + 
+            geom_bar(stat = "identity") + 
+            scale_y_continuous(label = percent_format()) + 
+            scale_fill_manual(values = c("#FA8368", "#67ACFA")) + 
+            ggtitle("Sentiment of Tweets") +
+            xlab("Tweet") +
+            ylab("Sentiment Value") +
+            theme(panel.background = element_blank(), 
+                  panel.grid.major.x = element_blank(),
+                  panel.grid.major.y = element_line(color = "grey"),
+                  legend.position = "top", legend.text = element_text(size = 12),
+                  legend.title = element_blank(), title = element_text(size = 16),
+                  axis.text = element_text(size = 12),
+                  axis.title = element_blank(), axis.text.x = element_blank(),
+                  axis.ticks = element_blank())
+    })
+    
+    output$sentiment_level <- renderText({
+        dat <- get_sentiment()
+        
+        paste0("The average sentiment for \"", input$search_string, "\" is ",
+               percent(mean(dat$sentiment_value)), " (positive values mean pos",
+               "itive sentiment).")
     })
 }
 

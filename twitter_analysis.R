@@ -68,3 +68,55 @@ wordcloud(d$word,d$freq,c(8,.3),2)
 
 #Now lets try it with frequent words plotted first
 wordcloud(d$word,d$freq,c(8,.5),2,,FALSE,.1)
+
+
+library(stringr)
+library(tidytext)
+library(scales)
+
+tweets <- df_dat %>%
+    unnest_tokens(clean_text, text)
+
+tweets <- tweets[, c("id", "clean_text")]
+sent <- get_sentiments(lexicon = "bing")
+tweets <- merge(tweets, sent, by.x = "clean_text", by.y = "word", all.x = TRUE)
+
+
+tweet_sent <- tweets %>% 
+    group_by(id) %>%
+    summarise(positive = length(clean_text[!is.na(sentiment) & sentiment == "positive"]),
+              negative = length(clean_text[!is.na(sentiment) & sentiment == "negative"]),
+              neutral = length(clean_text[is.na(sentiment)])) %>% 
+    mutate(perc_pos = positive / (positive + negative + neutral),
+           perc_neg = negative / (positive + negative + neutral),
+           perc_neut = neutral / (positive + negative + neutral))
+
+tweet_sent$sentiment <- case_when(
+    tweet_sent$perc_pos >= tweet_sent$perc_neg  ~ "Positive",
+    tweet_sent$perc_neg >= tweet_sent$perc_pos ~ "Negative",
+    1 == 1 ~ "Neutral"
+)
+
+tweet_sent$sentiment_value <- case_when(
+    tweet_sent$perc_pos >= tweet_sent$perc_neg  ~ tweet_sent$perc_pos,
+    tweet_sent$perc_neg >= tweet_sent$perc_pos ~ tweet_sent$perc_neg * -1,
+    1 == 1 ~ 0
+)
+
+df_dat <- merge(df_dat, tweet_sent, by = "id")
+
+df_dat <- df_dat[order(df_dat$created), ]
+
+ggplot(df_dat, aes(x = id, y = sentiment_value, group = sentiment, fill = sentiment)) + 
+    geom_bar(stat = "identity") + 
+    scale_y_continuous(label = percent_format()) + 
+    scale_fill_manual(values = c("#FA8368", "#67ACFA")) + 
+    ggtitle("Sentiment of Tweets") +
+    xlab("Tweet") +
+    ylab("Sentiment Value") +
+    theme(panel.background = element_blank(), 
+          panel.grid.major = element_line(color = "grey"),
+          legend.position = "top", legend.text = element_text(size = 8),
+          legend.title = element_blank(),
+          axis.title = element_text(size = 10), axis.text = element_text(size = 8),
+          axis.title.y = element_blank(), axis.text.x = element_blank())

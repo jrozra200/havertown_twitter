@@ -1,0 +1,10 @@
+name: twitter_shiny
+title:
+username:
+account: jakelearnsdatascience
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1414744
+bundleId: 2560018
+url: https://jakelearnsdatascience.shinyapps.io/twitter_shiny/
+when: 1572744221.80044

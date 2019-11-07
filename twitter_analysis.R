@@ -12,7 +12,7 @@ setup_twitter_oauth(creds$vars[1],
                     creds$vars[4])
 
 dat <- searchTwitter('', geocode = '39.9878,-75.3062,2mi',
-                     resultType = "recent", n = 25)
+                     resultType = "recent", n = 1000)
 dat <- searchTwitter('rstats', resultType = "recent", n = 25)
 
 df_dat <- data.frame()
@@ -22,6 +22,7 @@ for(tweet in 1:length(dat)){
     df_dat <- rbind(df_dat, tmp)
 }
 
+dat <- NULL
 tmp <- NULL
 
 df_dat$clean_text <- gsub("https.*$", "", df_dat$text)
@@ -68,7 +69,6 @@ wordcloud(d$word,d$freq,c(8,.3),2)
 
 #Now lets try it with frequent words plotted first
 wordcloud(d$word,d$freq,c(8,.5),2,,FALSE,.1)
-
 
 library(stringr)
 library(tidytext)

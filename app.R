@@ -17,6 +17,8 @@ library(tm)
 library(tidytext)
 library(scales)
 
+creds <- read.csv("twitter.config")
+
 setup_twitter_oauth(creds$vars[1], 
                     creds$vars[2], 
                     creds$vars[3], 
@@ -279,7 +281,7 @@ server <- function(input, output) {
     output$sentiment <- renderPlot({
         dat <- get_sentiment()
         
-        df_dat <- df_dat[order(df_dat$created), ]
+        df_dat <- dat[order(dat$created), ]
         
         ggplot(dat, aes(x = id, y = sentiment_value, group = sentiment, fill = sentiment)) + 
             geom_bar(stat = "identity") + 

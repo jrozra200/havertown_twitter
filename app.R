@@ -28,7 +28,7 @@ setup_twitter_oauth(creds$vars[1],
 ui <- fluidPage(
 
     # Application title
-    titlePanel(h1("Twitter Analysis", align = "center")),
+    titlePanel("Twitter Analysis"),
     
     
     # Sidebar with a slider input for number of bins 

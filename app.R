@@ -150,7 +150,7 @@ server <- function(input, output) {
         paste0("This dashboard searched twitter for the following search strin",
                "g:\"", input$search_string, "\". From this search, there were",
                " ", length(unique(dat$status_id)), " total tweets returned from ", 
-               length(unique(dat$screenName)), " unique twitter handles.")
+               length(unique(dat$screen_name)), " unique twitter handles.")
     })
     
     output$introduction2 <- renderText({ 

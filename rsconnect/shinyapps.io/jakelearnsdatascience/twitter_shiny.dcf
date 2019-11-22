@@ -5,8 +5,8 @@ account: jakelearnsdatascience
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 1506375
-bundleId: 2607766
+bundleId: 2608410
 url: https://jakelearnsdatascience.shinyapps.io/twitter_shiny/
-when: 1574362423.58553
+when: 1574383552.39526
 asMultiple: FALSE
 asStatic: FALSE

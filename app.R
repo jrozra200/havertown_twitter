@@ -8,7 +8,7 @@
 #
 
 library(shiny)
-library(twitteR)
+library(rtweet)
 library(wordcloud)
 library(tidyverse)
 library(knitr)
@@ -18,11 +18,13 @@ library(tidytext)
 library(scales)
 
 creds <- read.csv("twitter.config")
+creds$vars <- as.character(creds$vars)
 
-setup_twitter_oauth(creds$vars[1], 
-                    creds$vars[2], 
-                    creds$vars[3], 
-                    creds$vars[4])
+token <- create_token(app = "jake learns data science", 
+                      consumer_key = creds$vars[1], 
+                      consumer_secret = creds$vars[2], 
+                      access_token = creds$vars[3], 
+                      access_secret = creds$vars[4])
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -94,51 +96,30 @@ server <- function(input, output) {
     
     get_tweets <- reactive({
         if(input$check_dist == TRUE) {
-            searchTwitter(input$search_string, 
+            search_tweets(input$search_string, 
                           geocode = paste0(input$lat, ',', input$lon, ',', 
                                            input$dist, 'mi'),
-                          resultType = "recent", n = input$results)
+                          type = "recent", n = as.numeric(input$results))
         } else {
-            searchTwitter(input$search_string, resultType = "recent", 
-                          n = input$results)
+            search_tweets(input$search_string, type = "recent", 
+                          n = as.numeric(input$results))
         }
             
         })
     
-    format_data <- reactive({
-        dat <- get_tweets()
-        
-        df_dat <- data.frame()
-        for(tweet in 1:length(dat)){
-            tmp <- as.data.frame(dat[[tweet]])
-            
-            df_dat <- rbind(df_dat, tmp)
-        }
-        
-        tmp <- NULL
-        
-        df_dat$clean_text <- gsub("https.*$", "", df_dat$text)
-        df_dat$url <- gsub("^.*(https.*$)", "\\1", df_dat$text)
-        df_dat$url <- ifelse(grepl("^https", df_dat$url), df_dat$url, "")
-        df_dat$twitter_client <- gsub("</a>$", "", df_dat$statusSource)
-        df_dat$twitter_client <- gsub("<.*\">", "", df_dat$twitter_client)
-        
-        return(df_dat)
-    })
-    
     get_sentiment <- reactive({
-        dat <- format_data()
+        df_dat <- get_tweets()
         
-        tweets <- dat %>%
+        tweets <- df_dat %>%
             unnest_tokens(clean_text, text)
         
-        tweets <- tweets[, c("id", "clean_text")]
+        tweets <- tweets[, c("status_id", "clean_text")]
         sent <- get_sentiments(lexicon = "bing")
         tweets <- merge(tweets, sent, by.x = "clean_text", by.y = "word", all.x = TRUE)
         
         
         tweet_sent <- tweets %>% 
-            group_by(id) %>%
+            group_by(status_id) %>%
             summarise(positive = length(clean_text[!is.na(sentiment) & sentiment == "positive"]),
                       negative = length(clean_text[!is.na(sentiment) & sentiment == "negative"]),
                       neutral = length(clean_text[is.na(sentiment)])) %>% 
@@ -158,27 +139,27 @@ server <- function(input, output) {
             1 == 1 ~ 0
         )
         
-        dat <- merge(dat, tweet_sent, by = "id")
+        df_dat <- merge(df_dat, tweet_sent, by = "status_id")
         
-        return(dat)
+        return(df_dat)
     })
     
     output$introduction1 <- renderText({ 
-        dat <- format_data()
+        dat <- get_tweets()
         
         paste0("This dashboard searched twitter for the following search strin",
                "g:\"", input$search_string, "\". From this search, there were",
-               " ", length(unique(dat$id)), " total tweets returned from ", 
+               " ", length(unique(dat$status_id)), " total tweets returned from ", 
                length(unique(dat$screenName)), " unique twitter handles.")
     })
     
     output$introduction2 <- renderText({ 
-        dat <- format_data()
+        dat <- get_tweets()
         
-        earliest_tweet <- min(dat$created, na.rm = TRUE)
+        earliest_tweet <- min(dat$created_at, na.rm = TRUE)
         attributes(earliest_tweet)$tzone <- "America/New_York"
         
-        last_tweet <- max(dat$created, na.rm = TRUE)
+        last_tweet <- max(dat$created_at, na.rm = TRUE)
         attributes(last_tweet)$tzone <- "America/New_York"
         
         dif <- last_tweet - earliest_tweet
@@ -193,7 +174,7 @@ server <- function(input, output) {
     
     output$introduction3 <- renderText({ 
         if(input$check_dist == TRUE){
-            dat <- format_data()
+            dat <- get_tweets()
             
             paste0("You have selected to return tweets from within ", input$dist, 
                    " miles of ", input$lat, " latitude and ", input$lon, 
@@ -205,12 +186,12 @@ server <- function(input, output) {
     })
     
     output$most_favorited_tweet <- renderTable({
-        dat <- format_data()
+        dat <- get_tweets()
         
-        tab <- as.data.frame(dat[dat$favoriteCount == max(dat$favoriteCount), 
-                   c("created", "screenName", "clean_text", "favoriteCount", "url")])
+        tab <- as.data.frame(dat[dat$favorite_count == max(dat$favorite_count), 
+                   c("created_at", "screen_name", "text", "favorite_count", "url")])
         
-        tab$favoriteCount <- as.integer(tab$favoriteCount)
+        tab$favorite_count <- as.integer(tab$favorite_count)
         
         tab <- tab[1, ]
         
@@ -223,12 +204,13 @@ server <- function(input, output) {
     })
     
     output$most_retweeted <- renderTable({
-        dat <- format_data()
+        dat <- get_tweets()
         
-        tab <- as.data.frame(dat[dat$retweetCount == max(dat$retweetCount), 
-                                 c("created", "screenName", "clean_text", "retweetCount", "url")])
+        tab <- as.data.frame(dat[dat$retweet_count == max(dat$retweet_count), 
+                                 c("created_at", "screen_name", "text", 
+                                   "retweet_count", "url")])
         
-        tab$retweetCount <- as.integer(tab$retweetCount)
+        tab$retweet_count <- as.integer(tab$retweet_count)
         
         tab <- tab[1, ]
         
@@ -241,18 +223,18 @@ server <- function(input, output) {
     })
     
     output$top_5_tweeters <- renderTable({
-        dat <- format_data()
+        dat <- get_tweets()
         
         tab <- dat %>% 
-            group_by(screenName) %>% 
-            summarise(tweets = length(unique(id)))
+            group_by(screen_name) %>% 
+            summarise(tweets = length(unique(status_id)))
         
         tab <- tab[order(tab$tweets, decreasing = TRUE), ]
         
-        if(length(unique(dat$screenName)) >= 10){
+        if(length(unique(dat$screen_name)) >= 10){
             tab <- tab[1:10, ]
         } else {
-            tab <- tab[1:length(unique(dat$screenName)), ]
+            tab <- tab[1:length(unique(dat$screen_name)), ]
         }
         
         names(tab) <- c("Twitter Handle", "Tweets")
@@ -261,9 +243,9 @@ server <- function(input, output) {
     })
     
     output$wordcloud <- renderPlot({
-        dat <- format_data()
+        dat <- get_tweets()
         
-        wc <- Corpus(VectorSource(paste(dat$clean_text, collapse = " ")))
+        wc <- Corpus(VectorSource(paste(dat$text, collapse = " ")))
         
         wc <- tm_map(wc, removePunctuation)
         wc <- tm_map(wc, function(x){removeWords(x, stopwords())})
@@ -272,7 +254,6 @@ server <- function(input, output) {
         mat <- as.matrix(doc_mat)
         vec <- sort(rowSums(mat), decreasing = TRUE)
         df <- data.frame(word = names(vec), freq = vec)
-        # df <- df[1:20, ]
         
         wordcloud(df$word, df$freq, min.freq = 2, random.order = FALSE,
                   colors = "black", rot.per = 0.2, max.words = 100)
@@ -281,9 +262,9 @@ server <- function(input, output) {
     output$sentiment <- renderPlot({
         dat <- get_sentiment()
         
-        df_dat <- dat[order(dat$created), ]
+        df_dat <- dat[order(dat$created_at), ]
         
-        ggplot(dat, aes(x = id, y = sentiment_value, group = sentiment, fill = sentiment)) + 
+        ggplot(dat, aes(x = status_id, y = sentiment_value, group = sentiment, fill = sentiment)) + 
             geom_bar(stat = "identity") + 
             scale_y_continuous(label = percent_format()) + 
             scale_fill_manual(values = c("#FA8368", "#67ACFA")) + 

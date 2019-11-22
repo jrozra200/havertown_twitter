@@ -1,3 +1,18 @@
+library(rtweet)
+
+creds <- read.csv("twitter.config")
+
+creds$vars <- as.character(creds$vars)
+
+token <- create_token(app = "jake learns data science", 
+                      consumer_key = creds$vars[1], 
+                      consumer_secret = creds$vars[2], 
+                      access_token = creds$vars[3], 
+                      access_secret = creds$vars[4])
+
+rt <- search_tweets("", n = 100, geocode = '39.9878,-75.3062,2mi')
+
+
 ## JUST MESSING WITH TWITTER
 
 library(twitteR)

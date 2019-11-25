@@ -10,7 +10,7 @@ token <- create_token(app = "jake learns data science",
                       access_token = creds$vars[3], 
                       access_secret = creds$vars[4])
 
-rt <- search_tweets("", n = 100, geocode = '39.9878,-75.3062,2mi')
+dat <- search_tweets("", n = 1000, geocode = '39.9878,-75.3062,2mi')
 
 
 ## JUST MESSING WITH TWITTER

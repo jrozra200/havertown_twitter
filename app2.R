@@ -85,23 +85,41 @@ body <- dashboardBody(
         tabItem(
             tabName = "summary",
             box(
-                title = "Summary of Tweets",
+                title = "Summary of Results",
                 
                 width = 12,
                 
                 fluidRow(
-                    valueBoxOutput("searchString"),
-                    valueBoxOutput("numberTweets"),
-                    valueBoxOutput("numberTweeters")
+                    valueBoxOutput("searchString", width = 6),
+                    valueBoxOutput("geocode", width = 6)
+                ),
+                
+                fluidRow(
+                    valueBoxOutput("numberTweets", width = 6),
+                    valueBoxOutput("numberTweeters", width = 6)
                 ),
                 
                 fluidRow(
                     valueBoxOutput("earliestTweet"),
                     valueBoxOutput("latestTweet"),
                     valueBoxOutput("range")
-                ), 
+                )
+            ),
+            
+            box(
+                title = "Most Favorited Tweet",
                 
-                valueBoxOutput("introduction3", width = 12)
+                width = 6,
+                
+                tableOutput("most_favorited_tweet")
+            ),
+            
+            box(
+                title = "Most Retweeted Tweet",
+                
+                width = 6,
+                
+                tableOutput("most_retweeted")
             )
         )
     )
@@ -120,7 +138,6 @@ server <- function(input, output) {
             search_tweets(input$search_string, type = "recent", 
                           n = as.numeric(input$results))
         }
-        
     })
     
     get_sentiment <- reactive({
@@ -227,10 +244,10 @@ server <- function(input, output) {
         )
     })
     
-    output$introduction3 <- renderValueBox({ 
+    output$geocode <- renderValueBox({ 
         if(input$check_dist == TRUE){
             valueBox(
-                paste0("Within ", input$dist, " miles of [lat: ", 
+                paste0("≤ ", input$dist, " mi. of [lat: ", 
                        input$lat, ", lon: ", input$lon, "]"), 
                 "Geocode", 
                 icon = icon("map-marker-alt"), color = "blue"
@@ -247,14 +264,15 @@ server <- function(input, output) {
         dat <- get_tweets()
         
         tab <- as.data.frame(dat[dat$favorite_count == max(dat$favorite_count), 
-                                 c("created_at", "screen_name", "text", "favorite_count", "url")])
+                                 c("created_at", "screen_name", "text", 
+                                   "favorite_count")])
         
         tab$favorite_count <- as.integer(tab$favorite_count)
         
         tab <- tab[1, ]
         
         fin <- data.frame(attr = c("Tweet Date", "Twitter Handle", "Tweet", 
-                                   "Favorites", "URL"),
+                                   "Favorites"),
                           values = t(tab))
         names(fin) <- c("", "")
         
@@ -266,14 +284,14 @@ server <- function(input, output) {
         
         tab <- as.data.frame(dat[dat$retweet_count == max(dat$retweet_count), 
                                  c("created_at", "screen_name", "text", 
-                                   "retweet_count", "url")])
+                                   "retweet_count")])
         
         tab$retweet_count <- as.integer(tab$retweet_count)
         
         tab <- tab[1, ]
         
         fin <- data.frame(attr = c("Tweet Date", "Twitter Handle", "Tweet", 
-                                   "Retweets", "URL"),
+                                   "Retweets"),
                           values = t(tab))
         names(fin) <- c("", "")
         

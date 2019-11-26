@@ -47,6 +47,7 @@ sidebar <- dashboardSidebar(
         id = "sidebar",
         menuItem("Twitter Query", tabName = "inputs", icon = icon("keyboard")),
         menuItem("Summary", tabName = "summary", icon = icon("sort-amount-down")),
+        menuItem("Top Tweets", tabName = "top-tweets", icon = icon("user-tie")),
         menuItem("Sentiment", tabName = "sentiment", icon = icon("tachometer-alt")),
         menuItem("Word Cloud", tabName = "word-cloud", icon = icon("tachometer-alt"))
     )

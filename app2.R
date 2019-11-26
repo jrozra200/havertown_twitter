@@ -8,6 +8,7 @@ library(tm)
 library(tidytext)
 library(scales)
 library(shinydashboard)
+library(jsonlite)
 
 creds <- read.csv("twitter.config")
 creds$vars <- as.character(creds$vars)
@@ -111,7 +112,8 @@ body <- dashboardBody(
                 
                 width = 6,
                 
-                tableOutput("most_favorited_tweet")
+                tableOutput("most_favorited_embed"),
+                p("Need to add in images if appropriate.")
             ),
             
             box(
@@ -119,7 +121,8 @@ body <- dashboardBody(
                 
                 width = 6,
                 
-                tableOutput("most_retweeted")
+                uiOutput("most_retweeted_embed"),
+                p("Need to add in images if appropriate.")
             )
         )
     )
@@ -277,6 +280,26 @@ server <- function(input, output) {
         names(fin) <- c("", "")
         
         fin
+    })
+    
+    output$most_favorited_embed <- renderUI({
+        dat <- get_tweets()
+        
+        twitterURL <- paste0("https://publish.twitter.com/oembed?url=", 
+                             dat$status_url[dat$favorite_count == max(dat$favorite_count)][1])
+        html_json <- read_json(twitterURL)
+        
+        HTML(html_json$html)
+    })
+    
+    output$most_retweeted_embed <- renderUI({
+        dat <- get_tweets()
+        
+        twitterURL <- paste0("https://publish.twitter.com/oembed?url=", 
+                             dat$status_url[dat$retweet_count == max(dat$retweet_count)][1])
+        html_json <- read_json(twitterURL)
+        
+        HTML(html_json$html)
     })
     
     output$most_retweeted <- renderTable({

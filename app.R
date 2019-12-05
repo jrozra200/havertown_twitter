@@ -114,22 +114,20 @@ body <- dashboardBody(
             
             box(
                 title = "Most Favorited Tweet",
-                
                 width = 6,
+                align = "center",
                 
                 uiOutput("most_favorited_embed"),
-                uiOutput("most_favorited_stats"),
-                uiOutput("most_favorited_image")
+                uiOutput("most_favorited_stats")
             ),
             
             box(
                 title = "Most Retweeted Tweet",
-                
                 width = 6,
+                align = "center",
                 
                 uiOutput("most_retweeted_embed"),
-                uiOutput("most_retweeted_stats"),
-                uiOutput("most_retweeted_image")
+                uiOutput("most_retweeted_stats")
             ),
             
             box(
@@ -174,7 +172,7 @@ body <- dashboardBody(
                 width = 12,
                 height = 600,
                 
-                plotOutput("wordcloud", height = "600")
+                plotOutput("wordcloud", height = "500")
             )
         )
     )

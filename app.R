@@ -80,7 +80,9 @@ body <- dashboardBody(
                     column(4, textInput("lat", "Latitude", "39.9878")),
                     column(4, textInput("lon", "Longitude", "-75.3062")),
                     column(4, textInput("dist", "Distance (miles)", value = 2))
-                )
+                ),
+                
+                actionButton("summary_switch", "Submit")
             )
         ),
         
@@ -180,7 +182,15 @@ body <- dashboardBody(
 
 ui <- dashboardPage(header, sidebar, body)
 
-server <- function(input, output) { 
+server <- function(input, output, session) { 
+    observeEvent(input$summary_switch, {
+        newtab <- switch(input$sidebar,
+                         "inputs" = "summary",
+                         "summary" = "inputs"
+        )
+        updateTabItems(session, "sidebar", newtab)
+    })
+    
     get_tweets <- reactive({
         if(input$check_dist == TRUE) {
             search_tweets(input$search_string, 

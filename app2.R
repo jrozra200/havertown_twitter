@@ -106,15 +106,20 @@ body <- dashboardBody(
                     valueBoxOutput("latestTweet"),
                     valueBoxOutput("range")
                 )
-            ),
+            )
+        ),
+        
+        tabItem(
+            tabName = "top-tweets",
             
             box(
                 title = "Most Favorited Tweet",
                 
                 width = 6,
                 
-                tableOutput("most_favorited_embed"),
-                p("Need to add in images if appropriate.")
+                uiOutput("most_favorited_embed"),
+                uiOutput("most_favorited_stats"),
+                uiOutput("most_favorited_image")
             ),
             
             box(
@@ -123,9 +128,32 @@ body <- dashboardBody(
                 width = 6,
                 
                 uiOutput("most_retweeted_embed"),
-                p("Need to add in images if appropriate.")
+                uiOutput("most_retweeted_stats"),
+                uiOutput("most_retweeted_image")
+            ),
+            
+            box(
+                title = "Top 10 Tweeters",
+                
+                width = 12,
+                
+                uiOutput("top_5_tweeters")
             )
+        ),
+        
+        tabItem(
+            tabName = "sentiment",
+            
+            fluidRow(
+                valueBoxOutput("postive_tweets"),
+                valueBoxOutput("latestTweet"),
+                valueBoxOutput("range")
+            ),
+            textOutput("sentiment_level"),
+            br(),
+            plotOutput("sentiment", width = "100%", height = 600),
         )
+        
     )
 )
 
@@ -165,14 +193,14 @@ server <- function(input, output) {
                    perc_neut = neutral / (positive + negative + neutral))
         
         tweet_sent$sentiment <- case_when(
-            tweet_sent$perc_pos >= tweet_sent$perc_neg  ~ "Positive",
-            tweet_sent$perc_neg >= tweet_sent$perc_pos ~ "Negative",
+            tweet_sent$perc_pos > tweet_sent$perc_neg  ~ "Positive",
+            tweet_sent$perc_neg > tweet_sent$perc_pos ~ "Negative",
             1 == 1 ~ "Neutral"
         )
         
         tweet_sent$sentiment_value <- case_when(
-            tweet_sent$perc_pos >= tweet_sent$perc_neg  ~ tweet_sent$perc_pos,
-            tweet_sent$perc_neg >= tweet_sent$perc_pos ~ tweet_sent$perc_neg * -1,
+            tweet_sent$perc_pos > tweet_sent$perc_neg  ~ tweet_sent$perc_pos,
+            tweet_sent$perc_neg > tweet_sent$perc_pos ~ tweet_sent$perc_neg * -1,
             1 == 1 ~ 0
         )
         
@@ -293,6 +321,28 @@ server <- function(input, output) {
         HTML(html_json$html)
     })
     
+    output$most_favorited_stats <- renderText({
+        dat <- get_tweets()
+        
+        c('<p><img src="retweet.png" width = "20"> ', 
+          dat$retweet_count[dat$favorite_count == max(dat$favorite_count)][[1]][1], 
+          '<img src="heart.png" width = "35">',
+          dat$favorite_count[dat$favorite_count == max(dat$favorite_count)][[1]][1], 
+          '</p>')
+    })
+    
+    output$most_favorited_image <- renderText({
+        dat <- get_tweets()
+        
+        if(!is.na(dat$media_url[dat$favorite_count == max(dat$favorite_count)][[1]][1])){
+            c('<img src="', 
+              dat$media_url[dat$favorite_count == max(dat$favorite_count)][[1]][1], 
+              '" width="100%">')    
+        } else {
+            "<p></p>"
+        }
+    })
+    
     output$most_retweeted_embed <- renderUI({
         dat <- get_tweets()
         
@@ -303,31 +353,38 @@ server <- function(input, output) {
         HTML(html_json$html)
     })
     
-    output$most_retweeted <- renderTable({
+    output$most_retweeted_stats <- renderText({
         dat <- get_tweets()
         
-        tab <- as.data.frame(dat[dat$retweet_count == max(dat$retweet_count), 
-                                 c("created_at", "screen_name", "text", 
-                                   "retweet_count")])
-        
-        tab$retweet_count <- as.integer(tab$retweet_count)
-        
-        tab <- tab[1, ]
-        
-        fin <- data.frame(attr = c("Tweet Date", "Twitter Handle", "Tweet", 
-                                   "Retweets"),
-                          values = t(tab))
-        names(fin) <- c("", "")
-        
-        fin
+        c('<p><img src="retweet.png" width = "20"> ', 
+          dat$retweet_count[dat$retweet_count == max(dat$retweet_count)][[1]][1], 
+          '<img src="heart.png" width = "35">',
+          dat$favorite_count[dat$retweet_count == max(dat$retweet_count)][[1]][1], 
+          '</p>')
     })
     
-    output$top_5_tweeters <- renderTable({
+    output$most_retweeted_image <- renderText({
+        dat <- get_tweets()
+        
+        if(!is.na(dat$media_url[dat$retweet_count == max(dat$retweet_count)][[1]][1])){
+            c('<img src="', 
+              dat$media_url[dat$retweet_count == max(dat$retweet_count)][[1]][1], 
+              '" width="100%">')    
+        } else {
+            "<p></p>"
+        }
+    })
+    
+    output$top_5_tweeters <- renderText({
         dat <- get_tweets()
         
         tab <- dat %>% 
             group_by(screen_name) %>% 
-            summarise(tweets = length(unique(status_id)))
+            summarise(tweets = length(unique(status_id)),
+                      followers = max(followers_count),
+                      friends = max(friends_count),
+                      account_create = max(account_created_at),
+                      profile_pic = unique(profile_image_url))
         
         tab <- tab[order(tab$tweets, decreasing = TRUE), ]
         
@@ -337,9 +394,25 @@ server <- function(input, output) {
             tab <- tab[1:length(unique(dat$screen_name)), ]
         }
         
-        names(tab) <- c("Twitter Handle", "Tweets")
+        output <- c('<html><head><style>table {border-collapse: collapse;width: 100%;}',
+                    'td, th {border: 1px solid #dddddd;text-align: left;padding: 8px;}',
+                    'tr:nth-child(even) {background-color: #dddddd;}</style></head>',
+                    '<body><table><tr><th>Screen Name</th>',
+                    '<th>Recent Tweets</th><th>Followers</th><th>Friends</th>',
+                    '<th>Account Create Date</th><th>Profile Pic</th></tr>')
         
-        tab
+        for(i in 1:dim(tab)[1]){
+            output <- c(output,
+                        '<tr><td>', tab$screen_name[i], '</td>',
+                        '<td>', tab$tweets[i], '</td>',
+                        '<td>', tab$followers[i], '</td>',
+                        '<td>', tab$friends[i], '</td>',
+                        '<td>', as.character(as.Date(as.POSIXct(tab$account_create[i], origin="1970-01-01"))), '</td>',
+                        '<td><img src="', tab$profile_pic[i], '" width="42"></td>',
+                        '</tr>')
+        }
+        output <- c(output,
+                    '</table></body></html>')
     })
     
     output$wordcloud <- renderPlot({
@@ -362,12 +435,10 @@ server <- function(input, output) {
     output$sentiment <- renderPlot({
         dat <- get_sentiment()
         
-        df_dat <- dat[order(dat$created_at), ]
-        
         ggplot(dat, aes(x = status_id, y = sentiment_value, group = sentiment, fill = sentiment)) + 
             geom_bar(stat = "identity") + 
             scale_y_continuous(label = percent_format()) + 
-            scale_fill_manual(values = c("#FA8368", "#67ACFA")) + 
+            scale_fill_manual(values = c("#FA8368", "gray", "#67ACFA")) + 
             ggtitle("Sentiment of Tweets") +
             xlab("Tweet") +
             ylab("Sentiment Value") +
@@ -379,6 +450,14 @@ server <- function(input, output) {
                   axis.text = element_text(size = 12),
                   axis.title = element_blank(), axis.text.x = element_blank(),
                   axis.ticks = element_blank())
+    })
+    
+    output$postive_tweets <- renderValueBox({
+        dat <- get_sentiment()
+        
+        valueBox(length(dat$sentiment[dat$sentiment == "Positive"]),
+                 "Number of Positive Tweets")
+        
     })
     
     output$sentiment_level <- renderText({

@@ -10,7 +10,7 @@ token <- create_token(app = "jake learns data science",
                       access_token = creds$vars[3], 
                       access_secret = creds$vars[4])
 
-dat <- search_tweets("", n = 1000, geocode = '39.9878,-75.3062,2mi')
+dat <- search_tweets("", n = 100, geocode = '39.9878,-75.3062,2mi')
 
 
 ## JUST MESSING WITH TWITTER
@@ -92,13 +92,13 @@ library(scales)
 tweets <- df_dat %>%
     unnest_tokens(clean_text, text)
 
-tweets <- tweets[, c("id", "clean_text")]
+tweets <- tweets[, c("status_id", "clean_text")]
 sent <- get_sentiments(lexicon = "bing")
 tweets <- merge(tweets, sent, by.x = "clean_text", by.y = "word", all.x = TRUE)
 
 
 tweet_sent <- tweets %>% 
-    group_by(id) %>%
+    group_by(status_id) %>%
     summarise(positive = length(clean_text[!is.na(sentiment) & sentiment == "positive"]),
               negative = length(clean_text[!is.na(sentiment) & sentiment == "negative"]),
               neutral = length(clean_text[is.na(sentiment)])) %>% 

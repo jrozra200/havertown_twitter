@@ -1,12 +1,3 @@
-#
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
-
 library(shiny)
 library(rtweet)
 library(wordcloud)
@@ -16,6 +7,8 @@ library(wordcloud)
 library(tm)
 library(tidytext)
 library(scales)
+library(shinydashboard)
+library(jsonlite)
 
 creds <- read.csv("twitter.config")
 creds$vars <- as.character(creds$vars)
@@ -26,74 +19,170 @@ token <- create_token(app = "jake learns data science",
                       access_token = creds$vars[3], 
                       access_secret = creds$vars[4])
 
-# Define UI for application that draws a histogram
-ui <- fluidPage(
+header <- dashboardHeader(
+    title = "Twitter Analysis", 
+    
+    tags$li(a(href = paste0('https://twitter.com/intent/tweet?text=Check%20out',
+                            '%20this%20Twitter%20Analysis%20Shiny%20Dashboard%',
+                            '20created%20by%20Jacob%20Rozran%20(@rozran00)&url=h',
+                            'ttps%3a%2f%2fjakelearnsdatascience.shinyapps.io%2',
+                            'ftwitter_shiny%2f'),
+              icon("share-alt"),
+              title = "Share this app on Twitter"),
+            class = "dropdown"),
+    
+    tags$li(a(href = 'https://github.com/jrozra200/havertown_twitter',
+              icon("github"),
+              title = "Check out the code on Github"),
+            class = "dropdown"),
+    
+    tags$li(a(href = 'https://www.jakelearnsdatascience.com',
+              icon("bar-chart"),
+              title = "Back to Jake Learns Data Science"),
+            class = "dropdown")
+)
 
-    # Application title
-    titlePanel("Twitter Analysis"),
-    
-    
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(
-            h1("Let's Search Twitter"),
-            fluidRow(
-                column(6, textInput("search_string", "Topic to Search", "")),
-                column(6, textInput("results", "Max Number of Tweets to Get", 
-                                    value = 100))
-            ),
-            
-            helpText(paste0("Note: you cannot leave the search string (above) ",
-                            "blank if you uncheck this box requesting location",
-                            " details.")),
-            checkboxInput("check_dist", 
-                          paste0("Search a specific location? (belo",
-                                 "w will be ignored if unchecked)"),
-                          value = TRUE),
-            
-            fluidRow(
-                column(4, textInput("lat", "Latitude", "39.9878")),
-                column(4, textInput("lon", "Longitude", "-75.3062")),
-                column(4, textInput("dist", "Distance (miles)", value = 2))
+sidebar <- dashboardSidebar(
+    sidebarMenu( 
+        id = "sidebar",
+        menuItem("Twitter Query", tabName = "inputs", icon = icon("keyboard")),
+        menuItem("Summary", tabName = "summary", icon = icon("sort-amount-down")),
+        menuItem("Top Tweets", tabName = "top-tweets", icon = icon("user-tie")),
+        menuItem("Sentiment", tabName = "sentiment", icon = icon("tachometer-alt")),
+        menuItem("Word Cloud", tabName = "word-cloud", icon = icon("tachometer-alt"))
+    )
+)
+
+body <- dashboardBody(
+    tabItems(
+        tabItem(
+            tabName = "inputs",
+            box(
+                title = "Let's Search Twitter",
+                
+                width = 12,
+                
+                fluidRow(
+                    column(8, textInput("search_string", "Topic to Search", "")),
+                    column(4, textInput("results", "Max Number of Tweets to Get", 
+                                        value = 100))
                 ),
-            
-            actionButton("submit", "Submit")
+                
+                helpText(paste0("Note: you cannot leave the search string (above) ",
+                                "blank if you uncheck this box requesting location",
+                                " details.")),
+                checkboxInput("check_dist", 
+                              paste0("Search a specific location? (below will be i",
+                                     "gnored if unchecked)"),
+                              value = TRUE),
+                
+                fluidRow(
+                    column(4, textInput("lat", "Latitude", "39.9878")),
+                    column(4, textInput("lon", "Longitude", "-75.3062")),
+                    column(4, textInput("dist", "Distance (miles)", value = 2))
+                )
+            )
         ),
-
-        # Show a plot of the generated distribution
-        mainPanel(
-            h1("Summary"),
-            textOutput("introduction1"),
-            br(),
-            textOutput("introduction2"),
-            br(),
-            textOutput("introduction3"),
+        
+        tabItem(
+            tabName = "summary",
+            box(
+                title = "Summary of Results",
+                
+                width = 12,
+                
+                fluidRow(
+                    valueBoxOutput("searchString", width = 6),
+                    valueBoxOutput("geocode", width = 6)
+                ),
+                
+                fluidRow(
+                    valueBoxOutput("numberTweets", width = 6),
+                    valueBoxOutput("numberTweeters", width = 6)
+                ),
+                
+                fluidRow(
+                    valueBoxOutput("earliestTweet"),
+                    valueBoxOutput("latestTweet"),
+                    valueBoxOutput("range")
+                )
+            )
+        ),
+        
+        tabItem(
+            tabName = "top-tweets",
             
-            fluidRow(
-                column(6, h3("Most Favorited Tweet"), 
-                       tableOutput("most_favorited_tweet")),
-                column(6, h3("Most Retweeted Tweet"),
-                       tableOutput("most_retweeted"))
+            box(
+                title = "Most Favorited Tweet",
+                
+                width = 6,
+                
+                uiOutput("most_favorited_embed"),
+                uiOutput("most_favorited_stats"),
+                uiOutput("most_favorited_image")
             ),
             
-            h3("Twitter Sentiment"),
-            textOutput("sentiment_level"),
-            br(),
-            plotOutput("sentiment", width = "100%", height = 600),
+            box(
+                title = "Most Retweeted Tweet",
+                
+                width = 6,
+                
+                uiOutput("most_retweeted_embed"),
+                uiOutput("most_retweeted_stats"),
+                uiOutput("most_retweeted_image")
+            ),
             
-            fluidRow(
-                column(4, h3("Top 10 Tweeters"),
-                       tableOutput("top_5_tweeters")),
-                column(8, h3("Wordcloud of Tweets"),
-                       plotOutput("wordcloud", width = "100%", height = 600))
+            box(
+                title = "Top 10 Tweeters",
+                
+                width = 12,
+                
+                uiOutput("top_5_tweeters")
+            )
+        ),
+        
+        tabItem(
+            tabName = "sentiment",
+            
+            box(
+                title = "Sentiment Stats",
+                
+                width = 12,
+                
+                fluidRow(
+                    valueBoxOutput("postive_tweets"),
+                    valueBoxOutput("negative_tweets"),
+                    valueBoxOutput("neutral_tweets")
+                )    
+            ),
+            
+            box(
+                title = "Sentiment of Tweets",
+                
+                width = 12,
+                
+                plotOutput("sentiment", width = "100%", height = 600)
+            )
+        ),
+        
+        tabItem(
+            tabName = "word-cloud",
+            
+            box(
+                title = "Word Cloud of Tweeted Words",
+                
+                width = 12,
+                height = 600,
+                
+                plotOutput("wordcloud", height = "600")
             )
         )
     )
 )
 
-# Define server logic required to draw a histogram
-server <- function(input, output) {
-    
+ui <- dashboardPage(header, sidebar, body)
+
+server <- function(input, output) { 
     get_tweets <- reactive({
         if(input$check_dist == TRUE) {
             search_tweets(input$search_string, 
@@ -104,8 +193,7 @@ server <- function(input, output) {
             search_tweets(input$search_string, type = "recent", 
                           n = as.numeric(input$results))
         }
-            
-        })
+    })
     
     get_sentiment <- reactive({
         df_dat <- get_tweets()
@@ -128,14 +216,14 @@ server <- function(input, output) {
                    perc_neut = neutral / (positive + negative + neutral))
         
         tweet_sent$sentiment <- case_when(
-            tweet_sent$perc_pos >= tweet_sent$perc_neg  ~ "Positive",
-            tweet_sent$perc_neg >= tweet_sent$perc_pos ~ "Negative",
+            tweet_sent$perc_pos > tweet_sent$perc_neg  ~ "Positive",
+            tweet_sent$perc_neg > tweet_sent$perc_pos ~ "Negative",
             1 == 1 ~ "Neutral"
         )
         
         tweet_sent$sentiment_value <- case_when(
-            tweet_sent$perc_pos >= tweet_sent$perc_neg  ~ tweet_sent$perc_pos,
-            tweet_sent$perc_neg >= tweet_sent$perc_pos ~ tweet_sent$perc_neg * -1,
+            tweet_sent$perc_pos > tweet_sent$perc_neg  ~ tweet_sent$perc_pos,
+            tweet_sent$perc_neg > tweet_sent$perc_pos ~ tweet_sent$perc_neg * -1,
             1 == 1 ~ 0
         )
         
@@ -144,44 +232,86 @@ server <- function(input, output) {
         return(df_dat)
     })
     
-    output$introduction1 <- renderText({ 
-        dat <- get_tweets()
-        
-        paste0("This dashboard searched twitter for the following search strin",
-               "g:\"", input$search_string, "\". From this search, there were",
-               " ", length(unique(dat$status_id)), " total tweets returned from ", 
-               length(unique(dat$screen_name)), " unique twitter handles.")
+    output$searchString <- renderValueBox({
+        valueBox(
+            ifelse(input$search_string != "", input$search_string, "<blank>"), 
+            "Search String", icon = icon("search"),color = "blue"
+        )
     })
     
-    output$introduction2 <- renderText({ 
+    output$numberTweets <- renderValueBox({
+        dat <- get_tweets()
+        
+        valueBox(
+            length(unique(dat$status_id)), "Tweets", 
+            icon = icon("send", lib = "glyphicon"), color = "blue"
+        )
+    })
+    
+    output$numberTweeters <- renderValueBox({
+        dat <- get_tweets()
+        
+        valueBox(
+            length(unique(dat$screen_name)), "Unique Twitter Handles", 
+            icon = icon("at"), color = "blue"
+        )
+    })
+    
+    output$earliestTweet <- renderValueBox({
         dat <- get_tweets()
         
         earliest_tweet <- min(dat$created_at, na.rm = TRUE)
         attributes(earliest_tweet)$tzone <- "America/New_York"
         
-        last_tweet <- max(dat$created_at, na.rm = TRUE)
-        attributes(last_tweet)$tzone <- "America/New_York"
-        
-        dif <- last_tweet - earliest_tweet
-        
-        earliest_tweet <- format(earliest_tweet, "%B %d, %Y %I:%M:%S %p %Z")
-        last_tweet <- format(last_tweet, "%B %d, %Y %I:%M:%S %p %Z")
-        
-        paste0("The tweets returned span ", round(dif, 2), " ", 
-               attributes(dif)$units, "; from ", earliest_tweet, 
-               " to ", last_tweet, ".")
+        valueBox(
+            earliest_tweet, "Date & Time for Oldest Tweet", 
+            icon = icon("clock"), color = "blue"
+        )
     })
     
-    output$introduction3 <- renderText({ 
+    output$latestTweet <- renderValueBox({
+        dat <- get_tweets()
+        
+        latest_tweet <- max(dat$created_at, na.rm = TRUE)
+        attributes(latest_tweet)$tzone <- "America/New_York"
+        
+        valueBox(
+            latest_tweet, "Date & Time for Newest Tweet", 
+            icon = icon("clock"), color = "blue"
+        )
+    })
+    
+    output$range <- renderValueBox({
+        dat <- get_tweets()
+        
+        earliest_tweet <- min(dat$created_at, na.rm = TRUE)
+        attributes(earliest_tweet)$tzone <- "America/New_York"
+        
+        latest_tweet <- max(dat$created_at, na.rm = TRUE)
+        attributes(latest_tweet)$tzone <- "America/New_York"
+        
+        dif <- latest_tweet - earliest_tweet
+        
+        valueBox(
+            paste0(round(dif, 2), " ", attributes(dif)$units), 
+            "Time Range of Tweets", 
+            icon = icon("minus"), color = "blue"
+        )
+    })
+    
+    output$geocode <- renderValueBox({ 
         if(input$check_dist == TRUE){
-            dat <- get_tweets()
-            
-            paste0("You have selected to return tweets from within ", input$dist, 
-                   " miles of ", input$lat, " latitude and ", input$lon, 
-                   " longitude.")    
+            valueBox(
+                paste0("≤ ", input$dist, " mi. of [lat: ", 
+                       input$lat, ", lon: ", input$lon, "]"), 
+                "Geocode", 
+                icon = icon("map-marker-alt"), color = "blue"
+            )
         } else {
-            paste0("You have not selected a specific geocode to search, so thi",
-                   "s dashboard is searching all of twitter, geographically.")
+            valueBox(
+                "NA - No geocode inputted.", "Geocode", 
+                icon = icon("map-marker-alt"), color = "blue"
+            )
         }
     })
     
@@ -189,45 +319,95 @@ server <- function(input, output) {
         dat <- get_tweets()
         
         tab <- as.data.frame(dat[dat$favorite_count == max(dat$favorite_count), 
-                   c("created_at", "screen_name", "text", "favorite_count", "url")])
+                                 c("created_at", "screen_name", "text", 
+                                   "favorite_count")])
         
         tab$favorite_count <- as.integer(tab$favorite_count)
         
         tab <- tab[1, ]
         
         fin <- data.frame(attr = c("Tweet Date", "Twitter Handle", "Tweet", 
-                                   "Favorites", "URL"),
+                                   "Favorites"),
                           values = t(tab))
         names(fin) <- c("", "")
         
         fin
     })
     
-    output$most_retweeted <- renderTable({
+    output$most_favorited_embed <- renderUI({
         dat <- get_tweets()
         
-        tab <- as.data.frame(dat[dat$retweet_count == max(dat$retweet_count), 
-                                 c("created_at", "screen_name", "text", 
-                                   "retweet_count", "url")])
+        twitterURL <- paste0("https://publish.twitter.com/oembed?url=", 
+                             dat$status_url[dat$favorite_count == max(dat$favorite_count)][1])
+        html_json <- read_json(twitterURL)
         
-        tab$retweet_count <- as.integer(tab$retweet_count)
-        
-        tab <- tab[1, ]
-        
-        fin <- data.frame(attr = c("Tweet Date", "Twitter Handle", "Tweet", 
-                                   "Retweets", "URL"),
-                          values = t(tab))
-        names(fin) <- c("", "")
-        
-        fin
+        HTML(html_json$html)
     })
     
-    output$top_5_tweeters <- renderTable({
+    output$most_favorited_stats <- renderText({
+        dat <- get_tweets()
+        
+        c('<p><img src="retweet.png" width = "20"> ', 
+          dat$retweet_count[dat$favorite_count == max(dat$favorite_count)][[1]][1], 
+          '<img src="heart.png" width = "35">',
+          dat$favorite_count[dat$favorite_count == max(dat$favorite_count)][[1]][1], 
+          '</p>')
+    })
+    
+    output$most_favorited_image <- renderText({
+        dat <- get_tweets()
+        
+        if(!is.na(dat$media_url[dat$favorite_count == max(dat$favorite_count)][[1]][1])){
+            c('<img src="', 
+              dat$media_url[dat$favorite_count == max(dat$favorite_count)][[1]][1], 
+              '" width="100%">')    
+        } else {
+            "<p></p>"
+        }
+    })
+    
+    output$most_retweeted_embed <- renderUI({
+        dat <- get_tweets()
+        
+        twitterURL <- paste0("https://publish.twitter.com/oembed?url=", 
+                             dat$status_url[dat$retweet_count == max(dat$retweet_count)][1])
+        html_json <- read_json(twitterURL)
+        
+        HTML(html_json$html)
+    })
+    
+    output$most_retweeted_stats <- renderText({
+        dat <- get_tweets()
+        
+        c('<p><img src="retweet.png" width = "20"> ', 
+          dat$retweet_count[dat$retweet_count == max(dat$retweet_count)][[1]][1], 
+          '<img src="heart.png" width = "35">',
+          dat$favorite_count[dat$retweet_count == max(dat$retweet_count)][[1]][1], 
+          '</p>')
+    })
+    
+    output$most_retweeted_image <- renderText({
+        dat <- get_tweets()
+        
+        if(!is.na(dat$media_url[dat$retweet_count == max(dat$retweet_count)][[1]][1])){
+            c('<img src="', 
+              dat$media_url[dat$retweet_count == max(dat$retweet_count)][[1]][1], 
+              '" width="100%">')    
+        } else {
+            "<p></p>"
+        }
+    })
+    
+    output$top_5_tweeters <- renderText({
         dat <- get_tweets()
         
         tab <- dat %>% 
             group_by(screen_name) %>% 
-            summarise(tweets = length(unique(status_id)))
+            summarise(tweets = length(unique(status_id)),
+                      followers = max(followers_count),
+                      friends = max(friends_count),
+                      account_create = max(account_created_at),
+                      profile_pic = unique(profile_image_url))
         
         tab <- tab[order(tab$tweets, decreasing = TRUE), ]
         
@@ -237,9 +417,25 @@ server <- function(input, output) {
             tab <- tab[1:length(unique(dat$screen_name)), ]
         }
         
-        names(tab) <- c("Twitter Handle", "Tweets")
+        output <- c('<html><head><style>table {border-collapse: collapse;width: 100%;}',
+                    'td, th {border: 1px solid #dddddd;text-align: left;padding: 8px;}',
+                    'tr:nth-child(even) {background-color: #dddddd;}</style></head>',
+                    '<body><table><tr><th>Screen Name</th>',
+                    '<th>Recent Tweets</th><th>Followers</th><th>Friends</th>',
+                    '<th>Account Create Date</th><th>Profile Pic</th></tr>')
         
-        tab
+        for(i in 1:dim(tab)[1]){
+            output <- c(output,
+                        '<tr><td>', tab$screen_name[i], '</td>',
+                        '<td>', tab$tweets[i], '</td>',
+                        '<td>', tab$followers[i], '</td>',
+                        '<td>', tab$friends[i], '</td>',
+                        '<td>', as.character(as.Date(as.POSIXct(tab$account_create[i], origin="1970-01-01"))), '</td>',
+                        '<td><img src="', tab$profile_pic[i], '" width="42"></td>',
+                        '</tr>')
+        }
+        output <- c(output,
+                    '</table></body></html>')
     })
     
     output$wordcloud <- renderPlot({
@@ -262,12 +458,10 @@ server <- function(input, output) {
     output$sentiment <- renderPlot({
         dat <- get_sentiment()
         
-        df_dat <- dat[order(dat$created_at), ]
-        
         ggplot(dat, aes(x = status_id, y = sentiment_value, group = sentiment, fill = sentiment)) + 
             geom_bar(stat = "identity") + 
             scale_y_continuous(label = percent_format()) + 
-            scale_fill_manual(values = c("#FA8368", "#67ACFA")) + 
+            scale_fill_manual(values = c("#FA8368", "gray", "#67ACFA")) + 
             ggtitle("Sentiment of Tweets") +
             xlab("Tweet") +
             ylab("Sentiment Value") +
@@ -281,6 +475,33 @@ server <- function(input, output) {
                   axis.ticks = element_blank())
     })
     
+    output$postive_tweets <- renderValueBox({
+        dat <- get_sentiment()
+        
+        valueBox(length(dat$sentiment[dat$sentiment == "Positive"]),
+                 "Number of Positive Tweets",
+                 icon = icon("thumbs-up"), color = "blue")
+        
+    })
+    
+    output$negative_tweets <- renderValueBox({
+        dat <- get_sentiment()
+        
+        valueBox(length(dat$sentiment[dat$sentiment == "Negative"]),
+                 "Number of Negative Tweets",
+                 icon = icon("thumbs-down"), color = "blue")
+        
+    })
+    
+    output$neutral_tweets <- renderValueBox({
+        dat <- get_sentiment()
+        
+        valueBox(length(dat$sentiment[dat$sentiment == "Neutral"]),
+                 "Number of Neutral Tweets",
+                 icon = icon("equals"), color = "blue")
+        
+    })
+    
     output$sentiment_level <- renderText({
         dat <- get_sentiment()
         
@@ -290,5 +511,4 @@ server <- function(input, output) {
     })
 }
 
-# Run the application 
-shinyApp(ui = ui, server = server)
+shinyApp(ui, server)

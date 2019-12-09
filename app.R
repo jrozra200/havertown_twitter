@@ -9,6 +9,7 @@ library(tidytext)
 library(scales)
 library(shinydashboard)
 library(jsonlite)
+library(DT)
 
 creds <- read.csv("twitter.config")
 creds$vars <- as.character(creds$vars)
@@ -27,16 +28,19 @@ header <- dashboardHeader(
                             '20created%20by%20Jacob%20Rozran%20(@rozran00)&url=h',
                             'ttps%3a%2f%2fjakelearnsdatascience.shinyapps.io%2',
                             'ftwitter_shiny%2f'),
+              target = "_blank",
               icon("share-alt"),
               title = "Share this app on Twitter"),
             class = "dropdown"),
     
     tags$li(a(href = 'https://github.com/jrozra200/havertown_twitter',
+              target = "_blank",
               icon("github"),
               title = "Check out the code on Github"),
             class = "dropdown"),
     
     tags$li(a(href = 'https://www.jakelearnsdatascience.com',
+              target = "_blank",
               icon("bar-chart"),
               title = "Back to Jake Learns Data Science"),
             class = "dropdown")

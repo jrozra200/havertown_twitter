@@ -233,6 +233,14 @@ server <- function(input, output, session) {
         return(df)
     })
     
+    present_dat <- reactive({
+        dat <- get_tweets()
+        
+        df <- as.data.frame(select(dat, .data$user_id : .data$source))
+        
+        return(df)
+    })
+    
     get_sentiment <- reactive({
         df_dat <- get_tweets()
         
@@ -541,9 +549,7 @@ server <- function(input, output, session) {
     })
     
     output$raw_data <- renderDataTable({
-        dat <- get_tweets()
-        
-        dat
+        present_dat()
     })
     
     output$downloadData <- downloadHandler(

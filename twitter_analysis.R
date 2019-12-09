@@ -10,7 +10,9 @@ token <- create_token(app = "jake learns data science",
                       access_token = creds$vars[3], 
                       access_secret = creds$vars[4])
 
-dat <- search_tweets("", n = 100, geocode = '39.9878,-75.3062,2mi')
+dat <- search_tweets("", n = 10, geocode = '39.9878,-75.3062,2mi')
+
+dat1 <- dat %>% select_if(~!is.list(.))
 
 
 ## JUST MESSING WITH TWITTER

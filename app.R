@@ -49,7 +49,8 @@ sidebar <- dashboardSidebar(
         menuItem("Summary", tabName = "summary", icon = icon("sort-amount-down")),
         menuItem("Top Tweets", tabName = "top-tweets", icon = icon("user-tie")),
         menuItem("Sentiment", tabName = "sentiment", icon = icon("tachometer-alt")),
-        menuItem("Word Cloud", tabName = "word-cloud", icon = icon("tachometer-alt"))
+        menuItem("Word Cloud", tabName = "word-cloud", icon = icon("tachometer-alt")),
+        menuItem("Raw Data", tabName = "raw-data", icon = icon("download"))
     )
 )
 
@@ -65,7 +66,7 @@ body <- dashboardBody(
                 fluidRow(
                     column(8, textInput("search_string", "Topic to Search", "")),
                     column(4, textInput("results", "Max Number of Tweets to Get", 
-                                        value = 100))
+                                        value = 10))
                 ),
                 
                 helpText(paste0("Note: you cannot leave the search string (above) ",
@@ -176,6 +177,27 @@ body <- dashboardBody(
                 
                 plotOutput("wordcloud", height = "500")
             )
+        ),
+        
+        tabItem(
+            tabName = "raw-data",
+            
+            fluidRow(
+                box(
+                    title = "Download Data",
+                    
+                    width = 12,
+                    
+                    downloadButton("downloadData", "Download")
+                )
+            ),
+            fluidRow(
+                box(
+                    title = "Raw Data",
+                    width = 12,
+                    dataTableOutput("raw_data")
+                )
+            )
         )
     )
 )
@@ -201,6 +223,14 @@ server <- function(input, output, session) {
             search_tweets(input$search_string, type = "recent", 
                           n = as.numeric(input$results))
         }
+    })
+    
+    get_download <- reactive({
+        df_dat <- get_tweets()
+        
+        df <- df_dat %>% select_if(~!is.list(.))
+        
+        return(df)
     })
     
     get_sentiment <- reactive({
@@ -510,13 +540,21 @@ server <- function(input, output, session) {
         
     })
     
-    output$sentiment_level <- renderText({
-        dat <- get_sentiment()
+    output$raw_data <- renderDataTable({
+        dat <- get_tweets()
         
-        paste0("The average sentiment for \"", input$search_string, "\" is ",
-               percent(mean(dat$sentiment_value)), " (positive values mean pos",
-               "itive sentiment).")
+        dat
     })
+    
+    output$downloadData <- downloadHandler(
+        filename = "data.csv",
+        
+        content = function(file) {
+            write.csv(get_download(), file, row.names = FALSE)
+        }
+    )
+    
+    outputOptions(output, "downloadData", suspendWhenHidden = FALSE)
 }
 
 shinyApp(ui, server)

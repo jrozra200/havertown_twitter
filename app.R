@@ -188,12 +188,12 @@ body <- dashboardBody(
                     
                     width = 12,
                     
-                    downloadButton("downloadData", "Download")
+                    downloadButton("downloadData", "Download Raw Data")
                 )
             ),
             fluidRow(
                 box(
-                    title = "Raw Data",
+                    title = "Raw Data (not all columns shown)",
                     width = 12,
                     dataTableOutput("raw_data")
                 )

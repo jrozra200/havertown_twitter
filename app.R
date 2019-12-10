@@ -222,10 +222,12 @@ server <- function(input, output, session) {
             search_tweets(input$search_string, 
                           geocode = paste0(input$lat, ',', input$lon, ',', 
                                            input$dist, 'mi'),
-                          type = "recent", n = as.numeric(input$results))
+                          type = "recent", n = ifelse(as.numeric(input$results) > 1000,
+                                                      1000, as.numeric(input$results)))
         } else {
             search_tweets(input$search_string, type = "recent", 
-                          n = as.numeric(input$results))
+                          n = ifelse(as.numeric(input$results) > 1000,
+                                     1000, as.numeric(input$results)))
         }
     })
     
